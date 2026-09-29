@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Balloon Pop Party</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;800&display=swap">
+<style>
+/* Layout: one full-screen sky stage; a chunky prompt card floats at the top, balloons rise from the grass. */
+:root {
+  --sky-top: #7fd3ff;
+  --sky-bottom: #d9f3ff;
+  --grass: #7ccf5b;
+  --grass-dark: #4fa83a;
+  --ink: #1f3a5c;
+  --card: #fffdf6;
+  --sun: #ffd23f;
+  --accent: #ff5d8f;
+  --font-display: "Baloo 2", "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: "Nunito", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--sky-bottom);
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: linear-gradient(var(--sky-top), var(--sky-bottom) 75%);
+}
+.sun {
+  position: absolute; top: 5%; right: 6%;
+  width: 90px; height: 90px; border-radius: 50%;
+  background: var(--sun);
+  box-shadow: 0 0 0 14px rgba(255, 210, 63, .35), 0 0 0 30px rgba(255, 210, 63, .15);
+}
+.cloud {
+  position: absolute; background: #fff; border-radius: 999px; opacity: .9;
+  width: 140px; height: 44px;
+  animation: drift 60s linear infinite;
+}
+.cloud::before, .cloud::after {
+  content: ""; position: absolute; background: #fff; border-radius: 50%;
+}
+.cloud::before { width: 60px; height: 60px; left: 22px; top: -30px; }
+.cloud::after { width: 46px; height: 46px; left: 70px; top: -20px; }
+@keyframes drift { from { transform: translateX(-200px); } to { transform: translateX(110vw); } }
+.grass {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 12%;
+  background:
+    radial-gradient(circle at 10% 0, var(--grass) 30px, transparent 31px) 0 0 / 80px 40px repeat-x,
+    linear-gradient(var(--grass), var(--grass-dark));
+  border-top: 4px solid var(--grass-dark);
+  z-index: 1;
+}
+
+/* Top bar */
+.hud {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 0;
+  pointer-events: none;
+}
+.hud > * { pointer-events: auto; }
+.prompt {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 12px;
+  background: var(--card); border-radius: 24px;
+  padding: 8px 18px 8px 8px;
+  box-shadow: 0 6px 0 rgba(31, 58, 92, .18);
+  max-width: 520px;
+}
+.swatch {
+  flex: none; width: 56px; height: 64px;
+  border-radius: 50% 50% 48% 48%;
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 800; font-size: 32px; color: #fff;
+  text-shadow: 0 2px 0 rgba(0,0,0,.2);
+}
+.prompt-text { min-width: 0; }
+.prompt-text small {
+  display: block; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; opacity: .7;
+}
+.prompt-text strong {
+  display: block; font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(20px, 5vw, 30px); line-height: 1.05;
+}
+.stars {
+  display: flex; gap: 2px; font-size: 22px; margin-top: 2px;
+}
+.stars span { filter: grayscale(1) opacity(.35); transition: filter .2s, transform .2s; }
+.stars span.on { filter: none; transform: scale(1.15); }
+.btns { display: flex; gap: 8px; flex: none; }
+.round-btn {
+  width: 52px; height: 52px; border-radius: 50%; border: 0;
+  background: var(--card); color: var(--ink);
+  font-size: 24px; cursor: pointer;
+  box-shadow: 0 5px 0 rgba(31, 58, 92, .18);
+}
+.round-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(31, 58, 92, .18); }
+button:focus-visible { outline: 4px solid var(--accent); outline-offset: 3px; }
+
+/* Balloons */
+.balloon {
+  position: absolute; left: 0; top: 0;
+  width: var(--w); height: calc(var(--w) * 1.2);
+  border-radius: 50% 50% 48% 48% / 55% 55% 45% 45%;
+  background: radial-gradient(circle at 32% 28%, rgba(255,255,255,.75) 0 8%, rgba(255,255,255,0) 22%), var(--c);
+  box-shadow: inset -10px -14px 0 rgba(0,0,0,.12);
+  display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 800; color: #fff;
+  font-size: calc(var(--w) * .46);
+  text-shadow: 0 3px 0 rgba(0,0,0,.22);
+  cursor: pointer; z-index: 2;
+  will-change: transform;
+}
+.balloon::before { /* knot */
+  content: ""; position: absolute; bottom: -8px; left: 50%;
+  width: 14px; height: 12px; margin-left: -7px;
+  background: var(--c); clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.balloon::after { /* string */
+  content: ""; position: absolute; top: calc(100% + 4px); left: 50%;
+  width: 2px; height: calc(var(--w) * .8);
+  background: rgba(31, 58, 92, .45);
+}
+.balloon.wobble { animation: wobble .45s ease; }
+@keyframes wobble {
+  0%,100% { rotate: 0deg; } 25% { rotate: -12deg; } 75% { rotate: 12deg; }
+}
+.bit {
+  position: absolute; width: 12px; height: 12px; border-radius: 3px; z-index: 3;
+  pointer-events: none;
+}
+.plus {
+  position: absolute; z-index: 4; pointer-events: none;
+  font-family: var(--font-display); font-weight: 800; font-size: 34px;
+  color: var(--ink); animation: floatUp .9s ease-out forwards;
+}
+@keyframes floatUp { to { transform: translateY(-70px); opacity: 0; } }
+
+/* Menus */
+.overlay {
+  position: absolute; inset: 0; z-index: 10;
+  display: grid; place-items: center;
+  padding: 16px;
+  background: rgba(127, 211, 255, .55);
+  backdrop-filter: blur(3px);
+}
+.panel {
+  background: var(--card); border-radius: 32px;
+  padding: 28px 24px 24px;
+  width: min(460px, 100%);
+  text-align: center;
+  box-shadow: 0 10px 0 rgba(31, 58, 92, .18);
+  display: grid; gap: 16px;
+}
+.panel h1, .panel h2 {
+  margin: 0; font-family: var(--font-display); font-weight: 800; line-height: 1;
+  text-wrap: balance;
+}
+.panel h1 { font-size: clamp(40px, 11vw, 56px); color: var(--accent); }
+.panel h2 { font-size: clamp(32px, 9vw, 44px); }
+.panel p { margin: 0; font-size: 18px; }
+.modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.mode {
+  border: 0; border-radius: 22px; padding: 14px 6px 10px;
+  font-family: var(--font-display); font-weight: 800; font-size: 20px;
+  color: #fff; cursor: pointer;
+  display: grid; gap: 2px; justify-items: center;
+  box-shadow: 0 6px 0 rgba(0,0,0,.18);
+}
+.mode b { font-size: 34px; line-height: 1; }
+.mode:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.18); }
+.mode.colors { background: #ff5d5d; }
+.mode.numbers { background: #3d8bff; }
+.mode.letters { background: #9b5de5; }
+.big-btn {
+  border: 0; border-radius: 999px; padding: 14px 28px;
+  background: var(--accent); color: #fff; cursor: pointer;
+  font-family: var(--font-display); font-weight: 800; font-size: 24px;
+  box-shadow: 0 6px 0 rgba(0,0,0,.18); justify-self: center;
+}
+.big-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.18); }
+.link-btn {
+  border: 0; background: none; color: var(--ink); cursor: pointer;
+  font-family: var(--font-body); font-weight: 800; font-size: 16px; text-decoration: underline;
+}
+.trophy { font-size: 72px; line-height: 1; animation: bounce 1s ease infinite; }
+@keyframes bounce { 50% { transform: translateY(-10px); } }
+.demo-balloons { display: flex; justify-content: center; gap: 10px; }
+.demo-balloons span {
+  width: 34px; height: 42px; border-radius: 50% 50% 48% 48%;
+  animation: bounce 1.6s ease-in-out infinite;
+}
+.demo-balloons span:nth-child(2) { animation-delay: .2s; }
+.demo-balloons span:nth-child(3) { animation-delay: .4s; }
+.demo-balloons span:nth-child(4) { animation-delay: .6s; }
+.demo-balloons span:nth-child(5) { animation-delay: .8s; }
+
+@media (max-width: 420px) {
+  .swatch { width: 46px; height: 54px; font-size: 26px; }
+  .round-btn { width: 46px; height: 46px; font-size: 20px; }
+  .stars { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cloud, .trophy, .demo-balloons span { animation: none; }
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="sun"></div>
+  <div class="cloud" style="top:14%; animation-delay:-10s"></div>
+  <div class="cloud" style="top:30%; animation-delay:-38s; scale:.7"></div>
+  <div class="grass"></div>
+
+  <div class="hud" id="hud" hidden>
+    <div class="prompt">
+      <div class="swatch" id="swatch"></div>
+      <div class="prompt-text">
+        <small id="promptLabel">Pop the</small>
+        <strong id="promptText">red balloons!</strong>
+        <div class="stars" id="stars"></div>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="round-btn" id="soundBtn" aria-label="Sound on">🔊</button>
+      <button class="round-btn" id="homeBtn" aria-label="Back to menu">🏠</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="menu">
+    <div class="panel">
+      <div class="demo-balloons" aria-hidden="true">
+        <span style="background:#ff5d5d"></span><span style="background:#ffb13d"></span>
+        <span style="background:#ffd23f"></span><span style="background:#5bc85b"></span>
+        <span style="background:#3d8bff"></span>
+      </div>
+      <h1>Balloon Pop Party</h1>
+      <p>Tap the balloons that match. Pick a game!</p>
+      <div class="modes">
+        <button class="mode colors" data-mode="colors"><b>🎨</b>Colours</button>
+        <button class="mode numbers" data-mode="numbers"><b>123</b>Numbers</button>
+        <button class="mode letters" data-mode="letters"><b>ABC</b>Letters</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="win" hidden>
+    <div class="panel">
+      <div class="trophy" aria-hidden="true">🏆</div>
+      <h2 id="winTitle">Hooray!</h2>
+      <p id="winText">You popped them all!</p>
+      <button class="big-btn" id="nextBtn">Play again</button>
+      <button class="link-btn" id="menuBtn">Pick another game</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const COLORS = [
+    { name: "red", c: "#ff5d5d" },
+    { name: "orange", c: "#ffa033" },
+    { name: "yellow", c: "#ffcf2e" },
+    { name: "green", c: "#4cc25a" },
+    { name: "blue", c: "#3d8bff" },
+    { name: "purple", c: "#9b5de5" },
+    { name: "pink", c: "#ff7ac2" },
+  ];
+  const NUMBERS = ["1","2","3","4","5","6","7","8","9","10"];
+  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+  const PER_ROUND = 5;       // correct pops to finish a round
+  const ROUNDS = 3;          // rounds before the trophy
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const $ = id => document.getElementById(id);
+  const stage = $("stage");
+  const hud = $("hud");
+  let soundOn = true;
+  let audio = null;
+
+  const state = { mode: null, target: null, score: 0, round: 0, running: false };
+  let balloons = [];
+  let lastSpawn = 0;
+  let lastTime = 0;
+
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  // ---------- sound ----------
+  function ctx() {
+    if (!audio) {
+      try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { audio = null; }
+    }
+    return audio;
+  }
+  function tone(freq, dur, type = "sine", vol = 0.25, slide = 0) {
+    if (!soundOn) return;
+    const a = ctx(); if (!a) return;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, a.currentTime);
+    if (slide) o.frequency.exponentialRampToValueAtTime(freq * slide, a.currentTime + dur);
+    g.gain.setValueAtTime(vol, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + dur);
+    o.connect(g).connect(a.destination);
+    o.start(); o.stop(a.currentTime + dur);
+  }
+  const popSound = () => { tone(520, 0.12, "triangle", 0.3, 2.2); };
+  const nopeSound = () => { tone(220, 0.18, "sine", 0.15, 0.8); };
+  function fanfare() {
+    [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.25, "triangle", 0.25), i * 130));
+  }
+  function say(text) {
+    if (!soundOn || !("speechSynthesis" in window)) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 0.9; u.pitch = 1.2;
+      speechSynthesis.speak(u);
+    } catch {}
+  }
+
+  // ---------- targets ----------
+  function newTarget() {
+    const prev = state.target;
+    let t;
+    do {
+      if (state.mode === "colors") t = pick(COLORS);
+      else if (state.mode === "numbers") t = { label: pick(NUMBERS) };
+      else t = { label: pick(LETTERS) };
+    } while (prev && (t.name ? t.name === prev.name : t.label === prev.label));
+    state.target = t;
+    state.score = 0;
+    renderPrompt();
+    const phrase = state.mode === "colors" ? `Pop the ${t.name} balloons!`
+      : state.mode === "numbers" ? `Pop the number ${t.label}!`
+      : `Pop the letter ${t.label}!`;
+    say(phrase);
+  }
+  function isTarget(b) {
+    return state.mode === "colors" ? b.colorName === state.target.name : b.label === state.target.label;
+  }
+
+  function renderPrompt() {
+    const t = state.target, sw = $("swatch");
+    if (state.mode === "colors") {
+      sw.style.background = t.c; sw.textContent = "";
+      $("promptLabel").textContent = "Pop the";
+      $("promptText").textContent = `${t.name} balloons!`;
+    } else {
+      sw.style.background = state.mode === "numbers" ? "#3d8bff" : "#9b5de5";
+      sw.textContent = t.label;
+      $("promptLabel").textContent = state.mode === "numbers" ? "Find the number" : "Find the letter";
+      $("promptText").textContent = t.label;
+    }
+    renderStars();
+  }
+  function renderStars() {
+    const s = $("stars"); s.innerHTML = "";
+    for (let i = 0; i < PER_ROUND; i++) {
+      const sp = document.createElement("span");
+      sp.textContent = "⭐";
+      if (i < state.score) sp.className = "on";
+      s.appendChild(sp);
+    }
+  }
+
+  // ---------- balloons ----------
+  function spawn() {
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const w = Math.round(Math.min(110, Math.max(70, W / 6)));
+    const makeTarget = Math.random() < 0.4;
+    let colorObj, label = "";
+
+    if (state.mode === "colors") {
+      colorObj = makeTarget ? state.target : pick(COLORS.filter(c => c.name !== state.target.name));
+    } else {
+      colorObj = pick(COLORS);
+      const pool = state.mode === "numbers" ? NUMBERS : LETTERS;
+      label = makeTarget ? state.target.label : pick(pool.filter(x => x !== state.target.label));
+    }
+
+    const el = document.createElement("div");
+    el.className = "balloon";
+    el.style.setProperty("--w", w + "px");
+    el.style.setProperty("--c", colorObj.c);
+    el.textContent = label;
+    el.setAttribute("role", "button");
+    el.setAttribute("aria-label", label ? `${colorObj.name} balloon ${label}` : `${colorObj.name} balloon`);
+
+    const b = {
+      el, w, label, colorName: colorObj.name, color: colorObj.c,
+      x: rand(8, Math.max(9, W - w - 8)),
+      y: H + 20,
+      speed: rand(45, 80) * (reduceMotion ? 0.6 : 1) * Math.min(1.4, H / 700 + 0.4),
+      phase: rand(0, Math.PI * 2),
+      dead: false,
+    };
+    el.addEventListener("pointerdown", e => { e.preventDefault(); tap(b); });
+    stage.appendChild(el);
+    balloons.push(b);
+  }
+
+  function tap(b) {
+    if (b.dead || !state.running) return;
+    ctx(); // unlock audio on first touch
+    if (isTarget(b)) {
+      popSound();
+      burst(b);
+      removeBalloon(b);
+      state.score++;
+      renderStars();
+      if (state.score >= PER_ROUND) roundDone();
+    } else {
+      nopeSound();
+      b.el.classList.remove("wobble");
+      void b.el.offsetWidth;
+      b.el.classList.add("wobble");
+    }
+  }
+
+  function burst(b) {
+    const cx = b.x + b.w / 2, cy = b.y + b.w * 0.6;
+    const plus = document.createElement("div");
+    plus.className = "plus"; plus.textContent = "+1";
+    plus.style.left = (cx - 18) + "px"; plus.style.top = (cy - 30) + "px";
+    stage.appendChild(plus);
+    setTimeout(() => plus.remove(), 900);
+    if (reduceMotion) return;
+    for (let i = 0; i < 12; i++) {
+      const bit = document.createElement("div");
+      bit.className = "bit";
+      bit.style.background = i % 3 ? b.color : "#fff";
+      bit.style.left = cx + "px"; bit.style.top = cy + "px";
+      stage.appendChild(bit);
+      const ang = (i / 12) * Math.PI * 2, dist = rand(40, 90);
+      bit.animate([
+        { transform: "translate(0,0) rotate(0)", opacity: 1 },
+        { transform: `translate(${Math.cos(ang) * dist}px, ${Math.sin(ang) * dist + 30}px) rotate(${rand(90, 360)}deg)`, opacity: 0 },
+      ], { duration: 650, easing: "cubic-bezier(.2,.7,.4,1)" }).onfinish = () => bit.remove();
+    }
+  }
+
+  function removeBalloon(b) {
+    b.dead = true;
+    b.el.remove();
+  }
+
+  function clearBalloons() {
+    balloons.forEach(b => b.el.remove());
+    balloons = [];
+  }
+
+  function loop(t) {
+    if (!state.running) return;
+    const dt = Math.min(0.05, (t - (lastTime || t)) / 1000);
+    lastTime = t;
+    const W = stage.clientWidth;
+    const interval = W < 500 ? 1100 : 800;
+    const alive = balloons.filter(b => !b.dead).length;
+    if (t - lastSpawn > interval && alive < (W < 500 ? 7 : 11)) {
+      spawn(); lastSpawn = t;
+    }
+    // Make sure a matching balloon is always on its way.
+    if (!balloons.some(b => !b.dead && isTarget(b)) && t - lastSpawn > 300) {
+      spawn(); lastSpawn = t;
+    }
+    for (const b of balloons) {
+      if (b.dead) continue;
+      b.y -= b.speed * dt;
+      b.phase += dt * 1.6;
+      const sway = reduceMotion ? 0 : Math.sin(b.phase) * 10;
+      b.el.style.transform = `translate(${b.x + sway}px, ${b.y}px)`;
+      if (b.y < -b.w * 2.2) removeBalloon(b);
+    }
+    balloons = balloons.filter(b => !b.dead);
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- flow ----------
+  function start(mode) {
+    ctx();
+    state.mode = mode;
+    state.round = 0;
+    state.target = null;
+    $("menu").hidden = true;
+    $("win").hidden = true;
+    hud.hidden = false;
+    clearBalloons();
+    newTarget();
+    run();
+  }
+  function run() {
+    state.running = true;
+    lastTime = 0; lastSpawn = 0;
+    requestAnimationFrame(loop);
+  }
+  function roundDone() {
+    state.round++;
+    fanfare();
+    if (state.round >= ROUNDS) {
+      state.running = false;
+      setTimeout(() => {
+        clearBalloons();
+        $("winTitle").textContent = pick(["Hooray!", "You did it!", "Super star!", "Amazing!"]);
+        $("winText").textContent = `You popped ${PER_ROUND * ROUNDS} balloons!`;
+        $("win").hidden = false;
+        say("Hooray! You did it!");
+        $("nextBtn").focus();
+      }, 500);
+    } else {
+      say("Great job!");
+      setTimeout(newTarget, 900);
+    }
+  }
+  function toMenu() {
+    state.running = false;
+    clearBalloons();
+    hud.hidden = true;
+    $("win").hidden = true;
+    $("menu").hidden = false;
+    try { speechSynthesis.cancel(); } catch {}
+  }
+
+  document.querySelectorAll(".mode").forEach(btn =>
+    btn.addEventListener("click", () => start(btn.dataset.mode)));
+  $("nextBtn").addEventListener("click", () => start(state.mode));
+  $("menuBtn").addEventListener("click", toMenu);
+  $("homeBtn").addEventListener("click", toMenu);
+  $("soundBtn").addEventListener("click", () => {
+    soundOn = !soundOn;
+    $("soundBtn").textContent = soundOn ? "🔊" : "🔇";
+    $("soundBtn").setAttribute("aria-label", soundOn ? "Sound on" : "Sound off");
+    if (!soundOn) { try { speechSynthesis.cancel(); } catch {} }
+  });
+  // Tap the prompt card to hear the instruction again.
+  document.querySelector(".prompt").addEventListener("click", () => {
+    const t = state.target; if (!t) return;
+    say(state.mode === "colors" ? `Pop the ${t.name} balloons!` : `Find ${t.label}!`);
+  });
+})();
+</script>
+</body>
+</html>
