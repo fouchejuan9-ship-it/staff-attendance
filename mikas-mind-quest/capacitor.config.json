@@ -1,0 +1,12 @@
+{
+  "appId": "za.co.mikasmindquest.app",
+  "appName": "Mika's Mind Quest",
+  "webDir": "www",
+  "backgroundColor": "#f7ead0",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

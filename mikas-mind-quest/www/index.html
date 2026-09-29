@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mika's Mind Quest</title>
+<style>
+/* Layout: one column, max 720px. A winding quest map of five stops; each stop opens a question screen
+   with Mika's speech bubble on top, a big picture in the middle and chunky answer buttons below.
+   No web fonts or network calls: the app must work offline and send nothing anywhere. */
+:root {
+  --sand: #f7ead0;
+  --dune: #ecd3a1;
+  --card: #fffaf0;
+  --ink: #2e2733;
+  --ink-soft: #6b5f6e;
+  --acacia: #3d8c5c;
+  --sunset: #f26b3a;
+  --sky: #8fd0ee;
+  --right: #3aa35b;
+  --wrong: #c9bfb4;
+  --font-display: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Nunito", "Trebuchet MS", system-ui, sans-serif;
+  --font-body: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: linear-gradient(180deg, var(--sky) 0, var(--sand) 38%, var(--dune) 100%) fixed;
+  background-color: var(--sand);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 18px;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 4px solid var(--sunset); outline-offset: 3px; }
+.app {
+  max-width: 720px; min-height: 100%;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: calc(12px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 16px;
+}
+.screen { display: flex; flex-direction: column; gap: 16px; flex: 1; }
+
+/* Top bar */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--card); border-radius: 999px; padding: 8px 14px;
+  font-family: var(--font-display); font-weight: 800; font-size: 18px;
+  box-shadow: 0 4px 0 rgba(46, 39, 51, .12);
+}
+.icon-btn {
+  border: 0; background: var(--card); border-radius: 999px;
+  min-width: 48px; height: 48px; padding: 0 14px; cursor: pointer;
+  font-family: var(--font-display); font-weight: 800; font-size: 16px;
+  box-shadow: 0 4px 0 rgba(46, 39, 51, .12);
+}
+.icon-btn:active, .answer:active, .big-btn:active, .stop:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(46, 39, 51, .12); }
+
+/* Title */
+.hero { display: flex; align-items: center; gap: 12px; }
+.hero svg { width: 92px; height: 110px; flex: none; }
+.hero h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(32px, 8vw, 46px); line-height: .95; letter-spacing: -.01em;
+  text-wrap: balance;
+}
+.hero p { margin: 6px 0 0; color: var(--ink-soft); font-size: 17px; }
+
+/* Quest map */
+.map { display: flex; flex-direction: column; gap: 14px; position: relative; padding-block: 4px; }
+.map::before {
+  content: ""; position: absolute; left: 50%; top: 20px; bottom: 20px; width: 0;
+  border-left: 6px dotted rgba(46, 39, 51, .18); transform: translateX(-3px);
+}
+.stop {
+  position: relative; z-index: 1;
+  width: min(88%, 440px);
+  border: 0; cursor: pointer; text-align: left;
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+  background: var(--card); border-radius: 24px; padding: 12px 16px 12px 12px;
+  box-shadow: 0 6px 0 rgba(46, 39, 51, .12);
+}
+.stop:nth-child(odd) { align-self: flex-start; }
+.stop:nth-child(even) { align-self: flex-end; }
+.stop .badge {
+  width: 58px; height: 58px; border-radius: 18px;
+  display: grid; place-items: center; font-size: 32px; background: var(--c);
+}
+.stop .name { font-family: var(--font-display); font-weight: 800; font-size: 20px; line-height: 1.1; }
+.stop .blurb { font-size: 15px; color: var(--ink-soft); margin-top: 2px; }
+.stop .got { font-size: 16px; letter-spacing: 1px; white-space: nowrap; }
+.dim { filter: grayscale(1) opacity(.3); }
+
+/* Question screen */
+.progress { display: flex; gap: 6px; flex: 1; justify-content: center; }
+.progress span { width: 14px; height: 14px; border-radius: 50%; background: rgba(46, 39, 51, .15); }
+.progress span.done { background: var(--acacia); }
+.progress span.now { background: var(--sunset); transform: scale(1.25); }
+.talk { display: flex; align-items: flex-end; gap: 10px; }
+.talk svg { width: 64px; height: 78px; flex: none; }
+.bubble {
+  position: relative; flex: 1; min-width: 0;
+  background: var(--card); border-radius: 22px; padding: 14px 16px;
+  font-size: 20px; line-height: 1.35; font-weight: 700;
+  box-shadow: 0 4px 0 rgba(46, 39, 51, .1);
+}
+.bubble::before {
+  content: ""; position: absolute; left: -10px; bottom: 16px;
+  border: 10px solid transparent; border-right-color: var(--card); border-left: 0;
+}
+.bubble .say-btn {
+  float: right; margin: -4px -6px 4px 8px;
+  border: 0; background: var(--sand); border-radius: 999px; width: 40px; height: 40px;
+  font-size: 20px; cursor: pointer;
+}
+.bubble.good { color: var(--acacia); }
+.visual {
+  background: rgba(255, 250, 240, .6); border-radius: 28px;
+  min-height: 150px; padding: 18px 12px;
+  display: grid; place-items: center; text-align: center;
+  font-family: var(--font-display); font-weight: 800;
+}
+.visual .eq { font-size: clamp(40px, 12vw, 64px); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.visual .emoji-big { font-size: clamp(72px, 22vw, 110px); line-height: 1; }
+.visual .emoji-row { font-size: clamp(30px, 8vw, 42px); line-height: 1.3; letter-spacing: 2px; }
+.visual .caption { font-size: 22px; margin-top: 8px; color: var(--ink-soft); }
+.visual .word { font-size: clamp(44px, 13vw, 68px); letter-spacing: .12em; }
+.visual .groups { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.visual .groups span {
+  border: 3px dashed rgba(46, 39, 51, .25); border-radius: 18px; padding: 6px 10px;
+  font-size: clamp(26px, 7vw, 36px);
+}
+.answers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.answers.wide { grid-template-columns: 1fr; }
+.answer {
+  border: 0; cursor: pointer; border-radius: 22px;
+  background: var(--card); min-height: 76px; padding: 10px 12px;
+  font-family: var(--font-display); font-weight: 800; font-size: clamp(24px, 7vw, 34px);
+  box-shadow: 0 6px 0 rgba(46, 39, 51, .14);
+  display: grid; place-items: center; gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.answers.wide .answer { font-family: var(--font-body); font-size: 19px; font-weight: 700; text-align: left; justify-items: start; line-height: 1.3; }
+.answer small { display: block; font-size: 15px; font-weight: 700; color: var(--ink-soft); }
+.answer.right { background: var(--right); color: #fff; }
+.answer.right small { color: #fff; }
+.answer.wrong { background: var(--wrong); color: var(--ink-soft); animation: shake .4s; cursor: default; }
+@keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+/* End of round and parents */
+.panel {
+  background: var(--card); border-radius: 28px; padding: 24px 20px;
+  box-shadow: 0 8px 0 rgba(46, 39, 51, .12);
+  display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center;
+}
+.panel h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(30px, 8vw, 40px); text-wrap: balance; }
+.panel p { margin: 0; max-width: 34ch; line-height: 1.45; }
+.panel .left { text-align: left; align-self: stretch; max-width: none; }
+.big-stars { font-size: 54px; letter-spacing: 6px; }
+.big-stars span { display: inline-block; animation: pop .5s backwards; }
+.big-stars span:nth-child(2) { animation-delay: .2s; }
+.big-stars span:nth-child(3) { animation-delay: .4s; }
+@keyframes pop { from { transform: scale(0); } 70% { transform: scale(1.3); } }
+.big-btn {
+  border: 0; cursor: pointer; border-radius: 999px; padding: 14px 30px;
+  background: var(--sunset); color: #fff;
+  font-family: var(--font-display); font-weight: 800; font-size: 22px;
+  box-shadow: 0 6px 0 rgba(46, 39, 51, .18);
+}
+.big-btn.quiet { background: var(--sand); color: var(--ink); }
+.row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.gate-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 320px; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; font-weight: 700; }
+.toggle input { width: 26px; height: 26px; accent-color: var(--acacia); }
+.fine { font-size: 14px; color: var(--ink-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------------------------------------------------------------- helpers
+  const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const shuffle = arr => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  const sample = (arr, n) => shuffle(arr).slice(0, n);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const row = (e, n) => {
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(e + ((i + 1) % 5 === 0 && i + 1 < n ? "  " : ""));
+    return out.join(" ");
+  };
+
+  // Build a multiple-choice question; the correct answer is always options[0] before shuffling.
+  function mc(q, correct, distractors) {
+    const opts = shuffle([correct, ...distractors]);
+    return { ...q, options: opts, answer: opts.indexOf(correct) };
+  }
+  function numDistractors(n, count = 2) {
+    const cands = shuffle([n + 1, n - 1, n + 10, n - 10, n + 2, n - 2]).filter(x => x >= 0 && x !== n);
+    return [...new Set(cands)].slice(0, count);
+  }
+
+  // ---------------------------------------------------------------- Number Burrow
+  function genNumbers() {
+    const t = pick(["add", "add", "sub", "sub", "missing", "skip", "biggest", "double"]);
+    if (t === "add") {
+      const a = ri(11, 39), b = ri(2, 19), c = a + b;
+      return mc({ say: `What is ${a} plus ${b}?`, visual: `<div class="eq">${a} + ${b} = ?</div>`, why: `${a} + ${b} = ${c}` }, c, numDistractors(c));
+    }
+    if (t === "sub") {
+      const a = ri(15, 50), b = ri(2, 14), c = a - b;
+      return mc({ say: `What is ${a} take away ${b}?`, visual: `<div class="eq">${a} − ${b} = ?</div>`, why: `${a} − ${b} = ${c}` }, c, numDistractors(c));
+    }
+    if (t === "missing") {
+      const a = ri(5, 30), d = ri(3, 20), c = a + d;
+      return mc({ say: `${a} plus what makes ${c}?`, visual: `<div class="eq">${a} + ? = ${c}</div>`, why: `${a} + ${d} = ${c}` }, d, numDistractors(d));
+    }
+    if (t === "skip") {
+      const step = pick([2, 5, 10]), s = step * ri(1, 8);
+      const next = s + 3 * step;
+      return mc({ say: `Count on in ${step}s. What comes next?`, visual: `<div class="eq">${s}, ${s + step}, ${s + 2 * step}, ?</div>`, why: `Add ${step} each time: ${next}` },
+        next, [next + 1, next - step + 1].filter(x => x !== next));
+    }
+    if (t === "biggest") {
+      const nums = new Set();
+      const tens = ri(2, 8);
+      while (nums.size < 3) nums.add(ri(Math.max(10, (tens - 1) * 10), Math.min(99, (tens + 1) * 10 + 9)));
+      const arr = [...nums], big = Math.max(...arr);
+      return mc({ say: "Which number is the biggest?", visual: `<div class="emoji-big">🏆</div>`, why: `${big} is the biggest. Look at the tens first!` },
+        big, arr.filter(x => x !== big));
+    }
+    const n = ri(3, 15);
+    return mc({ say: `What is double ${n}?`, visual: `<div class="eq">${n} + ${n} = ?</div>`, why: `Double ${n} is ${2 * n}` }, 2 * n, numDistractors(2 * n));
+  }
+
+  // ---------------------------------------------------------------- Puzzle Path
+  const THINGS = [
+    { e: "🍎", n: "apples" }, { e: "🍌", n: "bananas" }, { e: "⚽", n: "balls" }, { e: "🐟", n: "fish" },
+    { e: "🍪", n: "biscuits" }, { e: "🌸", n: "flowers" }, { e: "🥚", n: "eggs" }, { e: "🍊", n: "oranges" },
+  ];
+  const CATEGORIES = [
+    { name: "fruit", items: ["🍎", "🍌", "🍇", "🍓", "🍐", "🍉"] },
+    { name: "animals", items: ["🐶", "🐱", "🐭", "🐰", "🦊", "🐘"] },
+    { name: "things that go", items: ["🚗", "🚌", "🚲", "🚂", "✈️", "🚜"] },
+    { name: "weather", items: ["☀️", "🌧️", "❄️", "⛈️", "🌈", "🌪️"] },
+    { name: "clothes", items: ["👕", "👖", "🧦", "🧢", "👟", "🧤"] },
+  ];
+  const PATTERN_SETS = [["🔴", "🔵", "🟡"], ["🐶", "🐱", "🐭"], ["⭐", "🌙", "☀️"], ["🍎", "🍌", "🍇"], ["🟩", "🟧", "🟪"]];
+  const SHAPES = { AB: [0, 1], ABC: [0, 1, 2], AAB: [0, 0, 1], ABB: [0, 1, 1] };
+
+  function genPuzzles() {
+    const t = pick(["more", "less", "groups", "pattern", "pattern", "odd", "odd"]);
+    const th = pick(THINGS);
+    if (t === "more") {
+      const a = ri(2, 7), b = ri(2, 6);
+      return mc({ say: `Mika has ${a} ${th.n}. She finds ${b} more. How many ${th.n} does she have now?`,
+        visual: `<div class="emoji-row">${row(th.e, a)}<br>➕<br>${row(th.e, b)}</div>`, why: `${a} + ${b} = ${a + b}` }, a + b, numDistractors(a + b));
+    }
+    if (t === "less") {
+      const a = ri(6, 12), b = ri(1, a - 3);
+      return mc({ say: `Mika has ${a} ${th.n}. She gives ${b} to her friend. How many are left?`,
+        visual: `<div class="emoji-row">${row(th.e, a)}</div><div class="caption">gives away ${b}</div>`, why: `${a} − ${b} = ${a - b}` }, a - b, numDistractors(a - b));
+    }
+    if (t === "groups") {
+      const g = ri(2, 4), k = ri(2, 5);
+      const groups = Array.from({ length: g }, () => `<span>${row(th.e, k)}</span>`).join("");
+      return mc({ say: `There are ${g} baskets. Each basket has ${k} ${th.n}. How many ${th.n} altogether?`,
+        visual: `<div class="groups">${groups}</div>`, why: `${Array(g).fill(k).join(" + ")} = ${g * k}` }, g * k, numDistractors(g * k));
+    }
+    if (t === "pattern") {
+      const set = pick(PATTERN_SETS), [shapeName, shape] = pick(Object.entries(SHAPES));
+      const seq = Array.from({ length: 7 }, (_, i) => set[shape[i % shape.length]]);
+      const next = set[shape[7 % shape.length]];
+      const others = [...new Set(set.filter(x => x !== next))];
+      while (others.length < 2) others.push(pick(PATTERN_SETS.flat().filter(x => x !== next && !others.includes(x))));
+      return mc({ say: "Look at the pattern. What comes next?", visual: `<div class="emoji-row">${seq.join(" ")} ❓</div>`,
+        why: shapeName === "AB" ? "It goes one, two, one, two!" : "The pattern repeats!" }, next, others.slice(0, 2));
+    }
+    const [main, other] = sample(CATEGORIES, 2);
+    const three = sample(main.items, 3), odd = pick(other.items);
+    return mc({ say: "Which one does not belong?", visual: `<div class="emoji-row">${shuffle([...three, odd]).join(" ")}</div>`,
+      why: `The others are all ${main.name}.` }, odd, three);
+  }
+
+  // ---------------------------------------------------------------- Word Waterhole
+  const WORDS = [
+    ["frog", "🐸"], ["duck", "🦆"], ["fish", "🐟"], ["crab", "🦀"], ["drum", "🥁"], ["star", "⭐"], ["ship", "🚢"],
+    ["sock", "🧦"], ["bell", "🔔"], ["cake", "🎂"], ["kite", "🪁"], ["moon", "🌙"], ["tree", "🌳"], ["bus", "🚌"],
+    ["egg", "🥚"], ["pig", "🐷"], ["fox", "🦊"], ["sun", "☀️"], ["bed", "🛏️"], ["snail", "🐌"], ["train", "🚂"],
+    ["shell", "🐚"], ["chick", "🐥"], ["snake", "🐍"], ["clock", "🕐"], ["truck", "🚚"], ["goat", "🐐"], ["boat", "⛵"],
+  ].map(([w, e]) => ({ w, e }));
+  const RHYMES = [
+    ["cat", "hat", "bat", "mat"], ["dog", "log", "frog", "fog"], ["sun", "run", "fun", "bun"], ["bed", "red", "fed", "shed"],
+    ["cake", "lake", "snake", "bake"], ["bell", "shell", "well", "tell"], ["moon", "spoon", "soon", "noon"],
+    ["pig", "big", "dig", "wig"], ["boat", "goat", "coat", "float"], ["star", "car", "jar", "far"],
+  ];
+  const VOWELS = "aeiou";
+
+  function misspell(w) {
+    const opts = [];
+    for (let i = 0; i < w.length; i++) {
+      if (VOWELS.includes(w[i])) for (const v of VOWELS) if (v !== w[i]) opts.push(w.slice(0, i) + v + w.slice(i + 1));
+    }
+    if (w.length > 3) opts.push(w.slice(0, 1) + w.slice(2)); // drop second letter
+    opts.push(w.slice(0, -1) + w.slice(-1).repeat(2));        // double last letter
+    return sample([...new Set(opts)].filter(x => x !== w), 2);
+  }
+
+  function genWords() {
+    const t = pick(["missing", "missing", "spell", "rhyme"]);
+    if (t === "missing") {
+      const { w, e } = pick(WORDS), i = ri(0, w.length - 1), ch = w[i];
+      const pool = (VOWELS.includes(ch) ? VOWELS : "bcdfgklmnprst").split("").filter(x => x !== ch);
+      const shown = w.slice(0, i) + "_" + w.slice(i + 1);
+      return mc({ say: "Which letter is missing?", speak: `Which letter is missing from ${w}?`,
+        visual: `<div><div class="emoji-big">${e}</div><div class="word">${shown}</div></div>`, why: `It spells ${w}!` }, ch, sample(pool, 2));
+    }
+    if (t === "spell") {
+      const { w, e } = pick(WORDS);
+      return mc({ say: "Which word matches the picture?", visual: `<div class="emoji-big">${e}</div>`, why: `${e} is spelt ${w}.` }, w, misspell(w));
+    }
+    const [grp, ...others] = shuffle(RHYMES);
+    const [target, match] = sample(grp, 2);
+    const wrong = sample(others, 2).map(g => pick(g));
+    return mc({ say: `Which word rhymes with “${target}”?`, visual: `<div class="word">${target}</div>`, why: `${target} and ${match} sound the same at the end.` }, match, wrong);
+  }
+
+  // ---------------------------------------------------------------- Emoji Story Stage
+  const STORIES = [
+    ["🌧️ ☂️ 🚶‍♀️", "It was raining, so she took her umbrella for a walk."],
+    ["🎂 🎈 🎁 😃", "It was his birthday party and he got a present."],
+    ["🐶 🦴 🕳️", "The dog dug a hole and hid its bone."],
+    ["🌱 💧 ☀️ 🌻", "The seed got water and sun and grew into a sunflower."],
+    ["⚽ 🪟 💥 😬", "The ball broke the window. Oops!"],
+    ["😴 ⏰ 🏃 🚌", "He woke up late and ran to catch the bus."],
+    ["🐒 🌴 🍌", "The monkey climbed the tree to get a banana."],
+    ["🪥 🦷 😁", "She brushed her teeth and gave a big smile."],
+    ["🧊 ☀️ 💧", "The ice melted in the sun and turned into water."],
+    ["🌙 📖 😴", "Mom read a story at night and he fell asleep."],
+    ["🥚 🍳 🍽️ 😋", "Dad cooked an egg and it was yummy."],
+    ["🐱 🧶 😾", "The cat played with the wool and got tangled."],
+  ].map(([e, s]) => ({ e, s }));
+  const NEXT = [
+    { seq: "🥚 🐣", a: "🐥", d: ["🍳", "🐟"], why: "The egg hatches into a chick." },
+    { seq: "🌱 🌿", a: "🌳", d: ["🍄", "🌵"], why: "The little plant grows into a big tree." },
+    { seq: "🥚 🐛", a: "🦋", d: ["🐝", "🐞"], why: "A caterpillar turns into a butterfly." },
+    { seq: "🌧️ ☀️", a: "🌈", d: ["❄️", "🌪️"], why: "Rain and sun together make a rainbow." },
+    { seq: "🍞 🔥", a: "🍞 ➡️ toast", d: ["🧊", "🥛"], why: "Bread in the heat turns into toast." },
+    { seq: "😫 🛏️", a: "😴", d: ["🏃", "🎉"], why: "When you are tired you go to sleep." },
+  ];
+
+  function genStories() {
+    if (Math.random() < 0.3) {
+      const n = pick(NEXT);
+      return mc({ say: "What happens next?", visual: `<div class="emoji-row">${n.seq} ➡️ ❓</div>`, why: n.why }, n.a, n.d);
+    }
+    const s = pick(STORIES);
+    const wrong = sample(STORIES.filter(x => x !== s), 2).map(x => x.s);
+    return { ...mc({ say: "Read the emoji story. Which sentence tells it?", visual: `<div class="emoji-big" style="font-size:clamp(46px,14vw,72px)">${s.e}</div>`, why: "Great reading!" }, s.s, wrong), wide: true };
+  }
+
+  // ---------------------------------------------------------------- Solid, Liquid, Gas Lab
+  const MATTER = [
+    ["🧊", "Ice", 0], ["🪨", "A rock", 0], ["🧱", "A brick", 0], ["🥄", "A spoon", 0], ["🍎", "An apple", 0], ["🧸", "A teddy bear", 0], ["✏️", "A pencil", 0],
+    ["🥛", "Milk", 1], ["💧", "Water", 1], ["🍯", "Honey", 1], ["🧃", "Juice", 1], ["☕", "Tea", 1], ["🛢️", "Oil", 1], ["🌊", "The sea", 1],
+    ["💨", "Wind (moving air)", 2], ["♨️", "Steam", 2], ["🎈", "The air inside a balloon", 2], ["🫧", "The air inside a bubble", 2],
+  ].map(([e, n, s]) => ({ e, n, s }));
+  const STATE_WHY = [
+    "A solid keeps its own shape.",
+    "A liquid flows and takes the shape of its container.",
+    "A gas spreads out to fill all the space. You often can't see it!",
+  ];
+  const CHANGES = [
+    { q: "What happens when ice is left in the sun?", e: "🧊 ☀️", a: "It melts into water", d: ["It turns into a rock", "It grows bigger"], why: "Heat melts a solid into a liquid." },
+    { q: "What happens to water in the freezer?", e: "💧 ❄️", a: "It freezes into ice", d: ["It turns into steam", "It turns into milk"], why: "Cold freezes a liquid into a solid." },
+    { q: "What comes out of a boiling kettle?", e: "🫖 🔥", a: "Steam, which is a gas", d: ["Ice cubes", "Sand"], why: "Boiling turns water into steam." },
+    { q: "What happens to chocolate in a hot car?", e: "🍫 🚗 ☀️", a: "It melts and goes runny", d: ["It freezes", "It turns into a rock"], why: "Heat melts the solid chocolate." },
+    { q: "Wet washing dries in the sun. Where does the water go?", e: "👕 ☀️", a: "Into the air as a gas", d: ["Into the pegs", "It turns into ice"], why: "The water evaporates into the air." },
+    { q: "What happens to candle wax when the candle burns?", e: "🕯️ 🔥", a: "It melts", d: ["It freezes", "It turns into juice"], why: "The flame's heat melts the wax." },
+  ];
+
+  function genMatter() {
+    if (Math.random() < 0.3) {
+      const c = pick(CHANGES);
+      return { ...mc({ say: c.q, visual: `<div class="emoji-big" style="font-size:clamp(56px,16vw,86px)">${c.e}</div>`, why: c.why }, c.a, c.d), wide: true };
+    }
+    const m = pick(MATTER);
+    return {
+      say: `${m.n}: is it a solid, a liquid or a gas?`,
+      visual: `<div><div class="emoji-big">${m.e}</div><div class="caption">${esc(m.n)}</div></div>`,
+      options: ["🧱<small>Solid</small>", "💧<small>Liquid</small>", "💨<small>Gas</small>"],
+      html: true, answer: m.s, why: STATE_WHY[m.s],
+    };
+  }
+
+  // ---------------------------------------------------------------- worlds
+  const WORLDS = [
+    { id: "numbers", name: "Number Burrow", icon: "🔢", color: "#ffc59e", blurb: "Add, take away and count on", gen: genNumbers },
+    { id: "puzzles", name: "Puzzle Path", icon: "🧩", color: "#b9e3c6", blurb: "Patterns, sums and odd one out", gen: genPuzzles },
+    { id: "words", name: "Word Waterhole", icon: "🔤", color: "#bfe3f5", blurb: "Letters, spelling and rhymes", gen: genWords },
+    { id: "stories", name: "Emoji Story Stage", icon: "🎭", color: "#f6c7de", blurb: "Read stories told in emoji", gen: genStories },
+    { id: "matter", name: "Solid, Liquid, Gas Lab", icon: "🧪", color: "#dcccf5", blurb: "Melting, freezing and steam", gen: genMatter },
+  ];
+  const ROUND = 8;
+  const PRAISE = ["Yes! 🎉", "Well done!", "Lekker! 🌟", "You got it!", "Super!", "Brilliant!"];
+  const RETRY = ["Nearly! Try another one.", "Not that one. Have another go!", "Hmm, think again!"];
+
+  // ---------------------------------------------------------------- saved progress (only on this device)
+  const KEY = "mikas-mind-quest-v1";
+  let save = { stars: {}, sound: true };
+  try { save = { ...save, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch {}
+  const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch {} };
+
+  // ---------------------------------------------------------------- sound
+  let actx = null;
+  function tone(freq, dur, type = "triangle", vol = 0.2, slide = 0, delay = 0) {
+    if (!save.sound) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = actx.currentTime + delay;
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t0);
+      if (slide) o.frequency.exponentialRampToValueAtTime(freq * slide, t0 + dur);
+      g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      o.connect(g).connect(actx.destination); o.start(t0); o.stop(t0 + dur);
+    } catch {}
+  }
+  const sfx = {
+    right: () => { tone(660, .12); tone(990, .18, "triangle", .2, 0, .1); },
+    wrong: () => tone(260, .2, "sine", .12, .8),
+    fanfare: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .25, "triangle", .2, 0, i * .13)),
+    tap: () => tone(440, .06, "sine", .1),
+  };
+  const canSpeak = "speechSynthesis" in window;
+  function speak(text) {
+    if (!canSpeak || !save.sound) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text.replace(/[“”]/g, ""));
+      u.rate = .9; u.pitch = 1.15; speechSynthesis.speak(u);
+    } catch {}
+  }
+
+  // ---------------------------------------------------------------- Mika the meerkat (original character)
+  const MIKA = `<svg viewBox="0 0 100 120" aria-hidden="true">
+    <ellipse cx="50" cy="88" rx="22" ry="30" fill="#d4a26a"/>
+    <ellipse cx="50" cy="93" rx="13" ry="21" fill="#f3d9ab"/>
+    <ellipse cx="33" cy="80" rx="6" ry="11" fill="#c28f58" transform="rotate(20 33 80)"/>
+    <ellipse cx="67" cy="80" rx="6" ry="11" fill="#c28f58" transform="rotate(-20 67 80)"/>
+    <circle cx="33" cy="22" r="6" fill="#8a5a33"/><circle cx="67" cy="22" r="6" fill="#8a5a33"/>
+    <ellipse cx="50" cy="38" rx="21" ry="22" fill="#d4a26a"/>
+    <ellipse cx="41" cy="36" rx="6.5" ry="7.5" fill="#5a3a22"/><ellipse cx="59" cy="36" rx="6.5" ry="7.5" fill="#5a3a22"/>
+    <circle cx="41" cy="36" r="3.4" fill="#fff"/><circle cx="59" cy="36" r="3.4" fill="#fff"/>
+    <circle cx="42" cy="37" r="1.8" fill="#2e2733"/><circle cx="60" cy="37" r="1.8" fill="#2e2733"/>
+    <ellipse cx="50" cy="50" rx="9" ry="7" fill="#f3d9ab"/>
+    <ellipse cx="50" cy="46.5" rx="3.5" ry="2.6" fill="#2e2733"/>
+    <path d="M45 52 Q50 56 55 52" stroke="#2e2733" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </svg>`;
+
+  // ---------------------------------------------------------------- screens
+  const app = document.getElementById("app");
+  const totalStars = () => Object.values(save.stars).reduce((a, b) => a + b, 0);
+  const starStr = n => [0, 1, 2].map(i => `<span class="${i < n ? "" : "dim"}">⭐</span>`).join("");
+
+  function showMap() {
+    try { speechSynthesis.cancel(); } catch {}
+    app.innerHTML = `
+      <div class="screen">
+        <div class="topbar">
+          <span class="chip">⭐ ${totalStars()} / ${WORLDS.length * 3}</span>
+          <button class="icon-btn" id="parents">Grown-ups</button>
+        </div>
+        <div class="hero">${MIKA}
+          <div><h1>Mika's Mind Quest</h1><p>Help Mika the meerkat explore the Kalahari. Pick a stop!</p></div>
+        </div>
+        <div class="map">
+          ${WORLDS.map(w => `
+            <button class="stop" data-id="${w.id}" style="--c:${w.color}">
+              <span class="badge">${w.icon}</span>
+              <span><span class="name">${w.name}</span><span class="blurb" style="display:block">${w.blurb}</span></span>
+              <span class="got" aria-label="${save.stars[w.id] || 0} stars">${starStr(save.stars[w.id] || 0)}</span>
+            </button>`).join("")}
+        </div>
+      </div>`;
+    app.querySelectorAll(".stop").forEach(b => b.onclick = () => { sfx.tap(); startWorld(WORLDS.find(w => w.id === b.dataset.id)); });
+    document.getElementById("parents").onclick = showGate;
+  }
+
+  let game = null;
+  function startWorld(world) {
+    const qs = [], seen = new Set();
+    let guard = 0;
+    while (qs.length < ROUND && guard++ < 200) {
+      const q = world.gen(), key = q.say + q.visual;
+      if (seen.has(key)) continue;
+      seen.add(key); qs.push(q);
+    }
+    game = { world, qs, i: 0, firstTry: 0, tries: 0 };
+    showQuestion();
+  }
+
+  function showQuestion() {
+    const { world, qs, i } = game, q = qs[i];
+    game.tries = 0;
+    app.innerHTML = `
+      <div class="screen">
+        <div class="topbar">
+          <button class="icon-btn" id="back" aria-label="Back to map">← Map</button>
+          <div class="progress" aria-label="Question ${i + 1} of ${qs.length}">
+            ${qs.map((_, k) => `<span class="${k < i ? "done" : k === i ? "now" : ""}"></span>`).join("")}
+          </div>
+          <span class="chip" style="background:${world.color}">${world.icon}</span>
+        </div>
+        <div class="talk">${MIKA}
+          <div class="bubble" id="bubble">${canSpeak ? `<button class="say-btn" id="say" aria-label="Read aloud">🔊</button>` : ""}<span id="msg">${esc(q.say)}</span></div>
+        </div>
+        <div class="visual">${q.visual}</div>
+        <div class="answers ${q.wide ? "wide" : ""}">
+          ${q.options.map((o, k) => `<button class="answer" data-k="${k}">${q.html ? o : esc(o)}</button>`).join("")}
+        </div>
+      </div>`;
+    document.getElementById("back").onclick = showMap;
+    const say = document.getElementById("say");
+    if (say) say.onclick = () => speak(q.speak || q.say);
+    app.querySelectorAll(".answer").forEach(b => b.onclick = () => answer(+b.dataset.k, b));
+  }
+
+  function answer(k, btn) {
+    const q = game.qs[game.i], msg = document.getElementById("msg"), bubble = document.getElementById("bubble");
+    if (btn.classList.contains("wrong") || btn.disabled) return;
+    if (k === q.answer) {
+      if (game.tries === 0) game.firstTry++;
+      btn.classList.add("right");
+      app.querySelectorAll(".answer").forEach(b => b.disabled = true);
+      bubble.classList.add("good");
+      const praise = pick(PRAISE);
+      msg.textContent = `${praise} ${q.why || ""}`;
+      sfx.right();
+      speak(`${praise.replace(/[^\w\s!.]/g, "")} ${q.why || ""}`);
+      setTimeout(() => {
+        game.i++;
+        game.i < game.qs.length ? showQuestion() : showDone();
+      }, 1900);
+    } else {
+      game.tries++;
+      btn.classList.add("wrong");
+      btn.setAttribute("aria-disabled", "true");
+      msg.textContent = pick(RETRY);
+      sfx.wrong();
+    }
+  }
+
+  function showDone() {
+    const { world, firstTry, qs } = game;
+    const stars = firstTry >= qs.length - 1 ? 3 : firstTry >= Math.ceil(qs.length * .6) ? 2 : 1;
+    const best = Math.max(stars, save.stars[world.id] || 0);
+    save.stars[world.id] = best; persist();
+    sfx.fanfare();
+    const title = stars === 3 ? "Superstar!" : stars === 2 ? "Great work!" : "Well done!";
+    speak(`${title} You got ${firstTry} out of ${qs.length} on the first try.`);
+    app.innerHTML = `
+      <div class="screen" style="justify-content:center">
+        <div class="panel">
+          ${MIKA.replace("<svg", '<svg style="width:110px;height:132px"')}
+          <h2>${title}</h2>
+          <div class="big-stars">${starStr(stars)}</div>
+          <p>You got <strong>${firstTry} out of ${qs.length}</strong> right on the first try in ${world.name}.</p>
+          <div class="row">
+            <button class="big-btn" id="again">Play again</button>
+            <button class="big-btn quiet" id="map">Back to map</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById("again").onclick = () => startWorld(world);
+    document.getElementById("map").onclick = showMap;
+  }
+
+  // Parental gate: a sum a Grade 2 child is unlikely to know, before any settings (and, later, any purchase).
+  function showGate() {
+    const a = ri(6, 9), b = ri(6, 9), c = a * b;
+    const opts = shuffle([c, c + a, c - b, c + 1]);
+    app.innerHTML = `
+      <div class="screen" style="justify-content:center">
+        <div class="panel">
+          <h2>Grown-ups only</h2>
+          <p>Please answer to continue: what is ${a} × ${b}?</p>
+          <div class="gate-grid">${opts.map(o => `<button class="answer" data-v="${o}">${o}</button>`).join("")}</div>
+          <button class="big-btn quiet" id="cancel">Back</button>
+        </div>
+      </div>`;
+    app.querySelectorAll(".gate-grid .answer").forEach(bt => bt.onclick = () => (+bt.dataset.v === c ? showParents() : showMap()));
+    document.getElementById("cancel").onclick = showMap;
+  }
+
+  function showParents() {
+    app.innerHTML = `
+      <div class="screen">
+        <div class="topbar"><button class="icon-btn" id="back">← Map</button></div>
+        <div class="panel">
+          <h2>For parents and teachers</h2>
+          <p class="left">Mika's Mind Quest is made for Grade 2 (ages 7 to 8). It practises number work to 99,
+            problem solving, phonics and reading, and early science about solids, liquids and gases.</p>
+          <p class="left"><strong>Privacy:</strong> this game has no ads, no chat and no sign-in. It collects no personal
+            information and works fully offline. Stars are saved only on this device.</p>
+          <label class="toggle" for="snd">Sound and read-aloud <input type="checkbox" id="snd" ${save.sound ? "checked" : ""}></label>
+          <button class="big-btn quiet" id="reset">Reset stars</button>
+          <p class="fine" id="resetMsg"></p>
+          <p class="fine">Version 0.1 prototype</p>
+        </div>
+      </div>`;
+    document.getElementById("back").onclick = showMap;
+    document.getElementById("snd").onchange = e => { save.sound = e.target.checked; persist(); };
+    const reset = document.getElementById("reset");
+    reset.onclick = () => {
+      if (reset.dataset.armed) { save.stars = {}; persist(); document.getElementById("resetMsg").textContent = "Stars reset."; reset.textContent = "Reset stars"; delete reset.dataset.armed; return; }
+      reset.dataset.armed = "1"; reset.textContent = "Tap again to confirm";
+    };
+  }
+
+  showMap();
+})();
+</script>
+</body>
+</html>
